@@ -15,7 +15,7 @@ class mySpider:
     def __init__(self):
         self.ask_url = "http://zjj.sz.gov.cn:8004/api/marketInfoShow/getFjzsInfoData"
         self.send_url = "https://sctapi.ftqq.com/"
-        self.send_key = {"qc_key": "SCT226350TjAo8bNymkSKjzt1gQIyPPIQx", "xr": "SCT226248TNQGtO5oTXqFyB3iBhMku9j8w"}
+        self.send_key = {"qc": "SCT226350TjAo8bNymkSKjzt1gQIyPPIQx", "xr": "SCT226248TNQGtO5oTXqFyB3iBhMku9j8w"}
 
     def getData(self, url, dateType="", startDate="", endDate=""):
         # 爬取数据
@@ -59,11 +59,20 @@ class mySpider:
             ysf_tot_area += data["ysfDealArea"][i]
             esf_tot_area += data["esfDealArea"][i]
         content = ""
-        content += f"6. 近三个月一手房成交面积/套数：{ysf_tot_area/ysf_tot_num:.2f}" + "\n\n"
-        content += f"7. 近三个月二手房成交面积/套数：{esf_tot_area/esf_tot_num:.2f}" + "\n\n"
-        content += f"8. 二手房近三年成交同比数：" + "\n\n"
+        content += f"5. 近三个月一手房成交面积/套数：{ysf_tot_area/ysf_tot_num:.2f}" + "\n\n"
+        content += f"6. 近三个月二手房成交面积/套数：{esf_tot_area/esf_tot_num:.2f}" + "\n\n"
+        content += f"7. 二手房近三年成交同比数：" + "\n\n"
         # print(content)
         return content
+
+    def get_three_year(self):
+        current_date = datetime.now().date()
+        year, month, day = current_date.year, current_date.month, current_date.day
+        startDate = f"{year-2}-{month}-{day}"
+        endDate = f"{year}-{month}-{day}"
+        data = self.getData(self.ask_url, startDate=startDate, endDate=endDate)
+        day_cnt = len(data['ysfTotalTs'])
+
 
     def push_data(self):
         content = ""
