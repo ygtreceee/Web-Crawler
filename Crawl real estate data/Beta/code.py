@@ -8,7 +8,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import base64
 from requests.exceptions import JSONDecodeError
-import sys
+import time
 
 
 class mySpider:
@@ -28,18 +28,21 @@ class mySpider:
             "endDate": endDate,
             "startDate": startDate,
         }
-        try:
-            resp = requests.post(spiderman.ask_url, json=ask_params)
-            data = resp.json()['data']
-        except JSONDecodeError:  # 处理 JSONDecodeError 异常
-            print("JSON解码错误")
-            print("Push failed!")
-            sys.exit(1)  # 强行结束程序
-        else:
-            # print(resp.status_code)
-            # print(resp.text)  # 读取数据
-            # print(data)
-            return data
+        while True:
+            try:
+                resp = requests.post(spiderman.ask_url, json=ask_params)
+                data = resp.json()['data']
+            except JSONDecodeError as e:  # 处理 JSONDecodeError 异常
+                print("JSON解码错误")
+                spiderman.push_error(type(e))
+                print("Push failed!")
+                time.sleep(60)  # 等待60s后再进行下次尝试
+                # sys.exit(1)  # 强行结束程序
+            else:
+                # print(resp.status_code)
+                # print(resp.text)  # 读取数据
+                # print(data)
+                return data
 
     @staticmethod
     def get_accumulation(data):
