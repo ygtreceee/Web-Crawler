@@ -1,49 +1,52 @@
 import io
 import pandas as pd
 import requests
-import time
-from datetime import datetime
-from io import StringIO
 from tabulate import tabulate
 import numpy as np
-import json
 from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
 import matplotlib.pyplot as plt
 import base64
+from requests.exceptions import JSONDecodeError
+import sys
 
 
 class mySpider:
+    ask_url = "http://zjj.sz.gov.cn:8004/api/marketInfoShow/getFjzsInfoData"
+    send_url = "https://sctapi.ftqq.com/"
+    developer_key = {"qc": "SCT226350TjAo8bNymkSKjzt1gQIyPPIQx"}
+    send_key = {"qc": "SCT226350TjAo8bNymkSKjzt1gQIyPPIQx"}
+
     def __init__(self):
-        self.ask_url = "http://zjj.sz.gov.cn:8004/api/marketInfoShow/getFjzsInfoData"
-        self.send_url = "https://sctapi.ftqq.com/"
-        self.send_key = {"qc": "SCT226350TjAo8bNymkSKjzt1gQIyPPIQx", "xr": "SCT226248TNQGtO5oTXqFyB3iBhMku9j8w"}
+        pass
 
     @staticmethod
-    def getData(url, dateType="", startDate="", endDate=""):
+    def getData(dateType="", startDate="", endDate=""):
         # 爬取数据
         ask_params = {
             "dateType": dateType,
             "endDate": endDate,
             "startDate": startDate,
         }
-        resp = requests.post(url, json=ask_params)
-        # print(resp.status_code)
-        # 读取数据
-        # print(resp.text)
-        data = resp.json()['data']
-        return data
+        try:
+            resp = requests.post(spiderman.ask_url, json=ask_params)
+            data = resp.json()['data']
+        except JSONDecodeError:  # 处理 JSONDecodeError 异常
+            print("JSON解码错误")
+            print("Push failed!")
+            sys.exit(1)  # 强行结束程序
+        else:
+            # print(resp.status_code)
+            # print(resp.text)  # 读取数据
+            # print(data)
+            return data
 
     @staticmethod
     def get_accumulation(data):
-        day_cnt = len(data['ysfTotalTs'])
-        ysf_tot_num, esf_tot_num, ysf_tot_area, esf_tot_area = 0, 0, 0, 0
-        for i in range(day_cnt):
-            ysf_tot_num += data["ysfTotalTs"][i]
-            esf_tot_num += data["esfTotalTs"][i]
-            ysf_tot_area += data["ysfDealArea"][i]
-            esf_tot_area += data["esfDealArea"][i]
-        return [ysf_tot_num, esf_tot_num, ysf_tot_area, esf_tot_area]
+        return [sum(data["ysfTotalTs"]),
+                sum(data["esfTotalTs"]),
+                sum(data["ysfDealArea"]),
+                sum(data["esfDealArea"])]
 
     def get_one_month(self):
         current_date = datetime.now().date()
@@ -51,7 +54,7 @@ class mySpider:
         startDate = f"{year}-{month}-01"
         endDate = f"{year}-{month}-{day}"
         day_cnt = day - 1
-        data = self.getData(self.ask_url, startDate=startDate, endDate=endDate)
+        data = self.getData(startDate=startDate, endDate=endDate)
         # print(data)
         val = self.get_accumulation(data)
         content = ""
@@ -63,7 +66,7 @@ class mySpider:
         return content
 
     def get_three_month(self):
-        data = self.getData(self.ask_url, dateType="3months")
+        data = self.getData(dateType="3months")
         val = self.get_accumulation(data)
         content = ""
         content += f"5. 近三个月一手房成交面积/套数：{val[2]/val[0]:.2f}" + "\n\n"
@@ -75,11 +78,9 @@ class mySpider:
     def get_three_year(self):
         current_date = datetime.now().date()
         year, month, day = current_date.year, current_date.month, current_date.day
-        startDate = f"{year}-{month}-01"
-        endDate = f"{year}-{month}-{day}"
-        exx_data = self.getData(self.ask_url, startDate=f"{year-2}-{month}-01", endDate=f"{year-2}-{month}-{day}")
-        ex_data = self.getData(self.ask_url, startDate=f"{year-1}-{month}-01", endDate=f"{year-1}-{month}-{day}")
-        pr_data = self.getData(self.ask_url, startDate=f"{year}-{month}-01", endDate=f"{year}-{month}-{day}")
+        exx_data = self.getData(startDate=f"{year-2}-{month}-01", endDate=f"{year-2}-{month}-{day}")
+        ex_data = self.getData(startDate=f"{year-1}-{month}-01", endDate=f"{year-1}-{month}-{day}")
+        pr_data = self.getData(startDate=f"{year}-{month}-01", endDate=f"{year}-{month}-{day}")
         exx_val = self.get_accumulation(exx_data)
         ex_val = self.get_accumulation(ex_data)
         pr_val = self.get_accumulation(pr_data)
@@ -92,7 +93,7 @@ class mySpider:
         return markdown_df
 
     def three_month_picture(self):
-        data = self.getData(self.ask_url, dateType="3months")
+        data = self.getData(dateType="3months")
         # print(data)
         x = data['date']
         ysf_values = data['ysfTotalTs']
@@ -100,8 +101,8 @@ class mySpider:
         # 作图
         bar_width = 0.5
         fig, ax = plt.subplots()
-        ysf_bars = ax.bar(x, ysf_values, bar_width, label='First-hand house')
-        esf_bars = ax.bar(x, esf_values, bar_width, label='Second-hand house', alpha=0.5)
+        ax.bar(x, ysf_values, bar_width, label='First-hand house')
+        ax.bar(x, esf_values, bar_width, label='Second-hand house', alpha=0.5)
         ax.set_title('Data Visualization')
         ax.set_xlabel('date')
         ax.set_ylabel('Volume')
@@ -119,11 +120,23 @@ class mySpider:
         # 构建Markdown字符串
         markdown_str = f"![chart](data:image/png;base64,{image_base64})"
         # 输出Markdown字符串
-        print(markdown_str)
+        # print(markdown_str)
         content = "8. 近三个月成交套数图表" + "\n\n"
         return content + markdown_str
 
+    @staticmethod
+    def send(key, text, content):
+        send_url = "https://sctapi.ftqq.com/"
+        send_params = {
+            "pushkey": key,
+            "text": text,
+            "desp": content,
+            "type": "markdown"
+        }
+        requests.post(send_url + key + ".send", send_params)
+
     def push_data(self):
+        print("pushing...")
         content = ""
         content += (self.get_one_month() +
                     self.get_three_month() +
@@ -131,13 +144,16 @@ class mySpider:
                     self.three_month_picture())
         # print(content)
         for name, key in self.send_key.items():
-            send_params = {
-                "pushkey": key,
-                "text": datetime.now().date().strftime("%Y-%m-%d") + "数据报告",
-                "desp": content,
-                "type": "markdown"
-            }
-            requests.post(self.send_url + key + ".send", send_params)
+            self.send(key, datetime.now().date().strftime("%Y-%m-%d") + "数据报告", content)
+        print("Successfully pushed!")
+
+    def push_error(self, error_type):
+        content = datetime.now().date().strftime("%Y-%m-%d") + "数据推送发生错误" + "\n\n"
+        content += "错误类型为 " + f"{error_type}"
+        self.send(self.developer_key, "错误报告", content)
+        content = "推送发生错误，请联系开发者"
+        for name, key in self.send_key.items():
+            self.send(key, datetime.now().date().strftime("%Y-%m-%d") + "数据报告", content)
 
     def job(self):
         print("job is running, time is ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -152,8 +168,6 @@ class mySpider:
         sched.remove_job('task')
 
 
-spiderman = mySpider()
-spiderman.push_data()
-
-# timer
-# get error
+if __name__ == "__main__":
+    spiderman = mySpider()
+    spiderman.push_data()
