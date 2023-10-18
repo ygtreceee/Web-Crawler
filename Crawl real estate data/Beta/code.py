@@ -192,3 +192,5 @@ class mySpider:
 if __name__ == "__main__":
     spiderman = mySpider()
     spiderman.push_data()
+
+
