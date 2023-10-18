@@ -22,7 +22,8 @@ data = {
 }
 
 
-# xr = "SCT226248TNQGtO5oTXqFyB3iBhMku9j8w"
+# "xr": "SCT226248TNQGtO5oTXqFyB3iBhMku9j8w"
+# "zl": "SCT226491T0oXTmmmRBCUkynwJU3tEITRx"
 qc = "PDU25968T53KADnbXVe3tgyL1HqwBupeEbvgk3pWM"
 # re = requests.post("https://sc.ftqq.com/"+ qc + ".send" ,data = data)
 
@@ -46,3 +47,5 @@ def job():
 sched = BlockingScheduler()
 sched.add_job(job, 'interval', seconds=60)
 sched.start()
+
+

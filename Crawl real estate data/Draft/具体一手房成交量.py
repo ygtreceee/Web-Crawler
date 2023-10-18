@@ -8,6 +8,7 @@ import json
 import scrapy
 from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
+from requests.exceptions import JSONDecodeError
 
 
 def getData():
@@ -16,6 +17,13 @@ def getData():
     qc_key = "SCT226350TjAo8bNymkSKjzt1gQIyPPIQx"
     # 爬取数据
     resp = requests.post(ask_url)
+    try:
+        data = resp.json()['data']
+    except JSONDecodeError as e:
+        print("JSON解码错误")
+        print(e)
+        print(type(e))
+
 
     # 读取列表数据
     ls = pd.read_html(StringIO(resp.text))
