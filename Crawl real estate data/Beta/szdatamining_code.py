@@ -13,21 +13,37 @@ import time
 
 class mySpider:
     ask_url = "http://zjj.sz.gov.cn:8004/api/marketInfoShow/getFjzsInfoData"
-    send_url = "https://sctapi.ftqq.com/"
-    developer_key = {"qc": "SCT226350TjAo8bNymkSKjzt1gQIyPPIQx", "xr": "SCT226248TNQGtO5oTXqFyB3iBhMku9j8w"}
-    send_key = []
+    ACCESS_TOKEN = ""
+    OPENID = []
 
     def __init__(self):
         pass
 
-    def getUserKey(self):
-        resp = requests.get("http://114.132.235.86:3000/api/v1/users").json()
-        id_key = resp['data']['users']
-        send_key = []
-        for item in id_key:
-            send_key.append(item['key'])
-        self.send_key = send_key
-        print(self.send_key)
+    @staticmethod
+    def get_access_token():
+        ask_url = "https://api.weixin.qq.com/cgi-bin/token?"
+        params = {
+            "grant_type": "client_credential",
+            "appid": "wx8dc9b83b9a5720ac",  # AppId
+            "secret": "cb8aeffb8e8d5b477b7ad97379aadfbc",  # AppSecret
+        }
+        resp = requests.get(ask_url, params=params)
+        data = resp.json()
+        # print(data)
+        # spiderman.ACCESS_TOKEN = data
+        mySpider.ACCESS_TOKEN = ("73_hZaso19mBB3wwO0adpzGsoiWDD_cK2VnefCxcddEmatxitCPM977C54L_CsiHeHtwuDbguKrTAZsxUu-M"
+                                 "-GV5XJSrxRFHA3a894INnqH75n-SFDPGE6QbqnYKvoWOLiAGAJBY")
+
+    @staticmethod
+    def get_openid():
+        ask_url = "https://api.weixin.qq.com/cgi-bin/user/get?"
+        params = {"access_token": spiderman.ACCESS_TOKEN, }
+        resp = requests.get(ask_url, params=params)
+        data = resp.json()['data']
+        openid_list = data['openid']  # type: list
+        # print(openid)
+        # spiderman.OPENID = openid_list
+        mySpider.OPENID = ["oAPA46nJ6ofI5PrehMws0NJQn_80",  "oAPA46gUnzHyRjk9Zy-FO1zd6XIg", ]
 
     @staticmethod
     def getData(dateType="", startDate="", endDate=""):
@@ -37,21 +53,9 @@ class mySpider:
             "endDate": endDate,
             "startDate": startDate,
         }
-        while True:
-            try:
-                resp = requests.post(spiderman.ask_url, json=ask_params)
-                data = resp.json()['data']
-            except JSONDecodeError as e:  # 处理 JSONDecodeError 异常
-                print("JSON解码错误")
-                print("Push failed!")
-                spiderman.push_error(type(e))
-                time.sleep(30)  # 等待60s后再进行下次尝试
-                # sys.exit(1)  # 强行结束程序
-            else:
-                # print(resp.status_code)
-                # print(resp.text)  # 读取数据
-                # print(data)
-                return data
+        resp = requests.post(spiderman.ask_url, json=ask_params)
+        data = resp.json()['data']
+        return data
 
     @staticmethod
     def get_accumulation(data):
@@ -144,16 +148,17 @@ class mySpider:
         content += "二手房成交图表\n\n" + esf_picture + "\n\n"
         return content
 
-    @staticmethod
-    def send(key, text, content):
-        send_url = "https://sctapi.ftqq.com/"
-        send_params = {
-            "pushkey": key,
-            "text": text,
-            "desp": content,
-            "type": "markdown"
+    def send(self, openid, template_id, data):
+        send_url = "https://api.weixin.qq.com/cgi-bin/message/template/send?"
+        tran_url = "http://114.132.235.86/index.html"
+        # tran_url = "http://www.szdatamining.com"
+        params = {
+            "touser": openid,
+            "template_id": template_id,
+            "url": tran_url,
+            "data": data,
         }
-        requests.post(send_url + key + ".send", send_params)
+        resp = requests.post(send_url+"access_token="+mySpider.ACCESS_TOKEN, json=params)
 
     @staticmethod
     def get_illustration():
@@ -163,8 +168,7 @@ class mySpider:
         content += "3. 一二手房成交图表数值选取自近三个月" + "\n\n"
         return content
 
-    def push_data(self):
-        print("pushing...")
+    def upload_data(self):    # 更新每日成交数据
         content = ""
         content += (self.get_one_month() +
                     self.get_three_month() +
@@ -173,33 +177,43 @@ class mySpider:
                     self.get_illustration()
                     )
         # print(content)
-        for key in self.send_key:
-            date = datetime.now().date()
-            self.send(key, f"{date.year}-{date.month}-{date.day - 1}" + "深圳成交简报", content)
+        # 网站抓取数据或者此处抓取并上传
+
+    def push_data(self):
+        print("pushing...")
+        self.upload_data()
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data = {
+            "thing10": {
+                "value": "接口测试"
+            },
+            "time4": {
+                "value": current_time
+            },
+        }
+        for openid in mySpider.OPENID:
+            self.send(openid, "yNC8coLEOfspayMEHX-Qmoj_3qpPNhZ26ej4bd8la1A", data)
         print("Successfully pushed!")
 
-    def push_error(self, error_type):
-        content = datetime.now().date().strftime("%Y-%m-%d") + "数据推送发生错误" + "\n\n"
-        content += "错误类型为 " + f"{error_type}"
-        self.send(self.developer_key, "错误报告", content)
-        content = "推送发生错误，请联系开发者"
-        for key in self.send_key:
-            self.send(key, datetime.now().date().strftime("%Y-%m-%d") + "数据报告", content)
-
-    def job(self):
-        print("job is running, time is ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        spiderman.getUserKey()
-        self.push_data()
-
-    def timer(self):
-        sched = BlockingScheduler()
-        # 截止到2023-10-31 00:00:00 每周一到周日早上九点半运行job_function
-        sched.add_job(self.job, 'cron', day_of_week='mon-sun', hour=9, minute=30, end_date='2023-10-31', id='task')
-        sched.start()
-        # 移除任务
-        sched.remove_job('task')
+    # def job(self):
+    #     print("job is running, time is ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    #     mySpider.get_access_token()  # 每日重新获取access_token
+    #     mySpider.get_openid()        # 每日重新获取openid
+    #     self.push_data()              # 发送数据日报
+    #
+    # def timer(self):
+    #     sched = BlockingScheduler()
+    #     # 截止到2023-10-31 00:00:00 每周一到周日早上九点半运行job_function
+    #     # sched.add_job(self.job, 'cron', day_of_week='mon-sun', hour=9, minute=30, end_date='2023-10-31', id='task')
+    #     sched.add_job(self.job, 'interval', seconds=2)
+    #     sched.start()
+    #     # 移除任务
+    #     sched.remove_job('task')
 
 
 if __name__ == "__main__":
     spiderman = mySpider()
-    spiderman.timer()
+    spiderman.get_access_token()
+    spiderman.get_openid()
+    spiderman.push_data()
+    # spiderman.timer()
