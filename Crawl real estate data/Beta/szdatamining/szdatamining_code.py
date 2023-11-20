@@ -1,10 +1,12 @@
 import io
+import json
+
 import pandas as pd
 import requests
 from tabulate import tabulate
 import numpy as np
 from apscheduler.schedulers.blocking import BlockingScheduler
-from datetime import datetime
+import datetime
 import matplotlib.pyplot as plt
 import base64
 from requests.exceptions import JSONDecodeError
@@ -65,7 +67,7 @@ class mySpider:
                 sum(data["esfDealArea"])]
 
     def get_one_month(self):
-        current_date = datetime.now().date()
+        current_date = datetime.datetime.now().date()
         year, month, day = current_date.year, current_date.month, current_date.day
         startDate = f"{year}-{month}-01"
         endDate = f"{year}-{month}-{day}"
@@ -91,7 +93,7 @@ class mySpider:
         return content
 
     def get_three_year(self):
-        current_date = datetime.now().date()
+        current_date = datetime.datetime.now().date()
         year, month, day = current_date.year, current_date.month, current_date.day
         data, tot_num = [], []
         for i in range(0, 4):
@@ -148,7 +150,8 @@ class mySpider:
         content += "二手房成交图表\n\n" + esf_picture + "\n\n"
         return content
 
-    def send(self, openid, template_id, data):
+    @staticmethod
+    def send(openid, template_id, data):
         send_url = "https://api.weixin.qq.com/cgi-bin/message/template/send?"
         tran_url = "http://114.132.235.86/index.html"
         # tran_url = "http://www.szdatamining.com"
@@ -169,6 +172,9 @@ class mySpider:
         return content
 
     def upload_data(self):    # 更新每日成交数据
+        url = "http://114.132.235.86:3000/api/v1/information"
+        today = datetime.date.today()
+        weekday = today.weekday()
         content = ""
         content += (self.get_one_month() +
                     self.get_three_month() +
@@ -176,13 +182,18 @@ class mySpider:
                     self.get_three_year() +
                     self.get_illustration()
                     )
-        # print(content)
+        data = {
+            "weekday": weekday + 1,
+            "content": content,
+        }
         # 网站抓取数据或者此处抓取并上传
+        resp = requests.post(url, data=data)
+        # print(resp.status_code)
 
     def push_data(self):
         print("pushing...")
         self.upload_data()
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         data = {
             "thing10": {
                 "value": "接口测试"
@@ -213,7 +224,8 @@ class mySpider:
 
 if __name__ == "__main__":
     spiderman = mySpider()
-    spiderman.get_access_token()
-    spiderman.get_openid()
-    spiderman.push_data()
+    # spiderman.get_access_token()
+    # spiderman.get_openid()
+    # spiderman.push_data()
     # spiderman.timer()
+    spiderman.upload_data()
