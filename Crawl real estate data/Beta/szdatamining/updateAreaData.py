@@ -6,9 +6,27 @@ from selenium import webdriver
 import requests
 import datetime
 import calendar
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 
+def getData(dateType="", startDate="", endDate=""):
+    # 爬取数据
+    ask_params = {
+        "dateType": dateType,
+        "endDate": endDate,
+        "startDate": startDate,
+    }
+    resp = requests.post("http://zjj.sz.gov.cn:8004/api/marketInfoShow/getFjzsInfoData", json=ask_params)
+    data = resp.json()['data']
+    # print(data)
+    return data
 
+
+def get_accumulation(data):
+    return [sum(data["ysfTotalTs"]),
+            sum(data["esfTotalTs"]),
+            sum(data["ysfDealArea"]),
+            sum(data["esfDealArea"])]
 
 
 def getAreaData_month():
@@ -45,28 +63,27 @@ def getAreaData_month():
         "month": month,
         "content": dataDict,
     }
-    updateData("http://114.132.235.86:3001/api/v1/rationInformation", data)
+    updateData("http://114.132.235.86:3001/api/v1/ratioInformation", data)
     browser.close()
     print("Successfully update!")
 
-def getData(dateType="", startDate="", endDate=""):
-    # 爬取数据
-    ask_params = {
-        "dateType": dateType,
-        "endDate": endDate,
-        "startDate": startDate,
+
+def getTotalData_month():
+    url = "http://114.132.235.86:3001/api/v1/soldInformation"
+    current_date = datetime.datetime.now().date()
+    yesterday = current_date - datetime.timedelta(days=1)
+    year, month = yesterday.year, yesterday.month
+    _, last_day = calendar.monthrange(year, month)
+    first_day_str = yesterday.replace(day=1).strftime("%Y-%m-%d")
+    last_day_str = yesterday.strftime("%Y-%m-%d")
+    # print(last_day_str, first_day_str)
+    value = get_accumulation(getData(startDate=first_day_str, endDate=last_day_str))
+    data = {
+        "year": year,
+        "month": month,
+        "content": value[1]
     }
-    resp = requests.post("http://zjj.sz.gov.cn:8004/api/marketInfoShow/getFjzsInfoData", json=ask_params)
-    data = resp.json()['data']
-    # print(data)
-    return data
-
-
-def get_accumulation(data):
-    return [sum(data["ysfTotalTs"]),
-            sum(data["esfTotalTs"]),
-            sum(data["ysfDealArea"]),
-            sum(data["esfDealArea"])]
+    updateData(url, data)
 
 
 def getTotalData_months():
@@ -101,9 +118,9 @@ def getTotalData_months():
     print("Successfully update!")
 
 
-
 def updateData(url, data):
     resp = requests.post(url, json=data)
+
 
 def getInformation():
     resp = requests.get("http://114.132.235.86:3001/api/v1/information")
@@ -113,7 +130,33 @@ def getInformation():
     print(data['ratioInformation'])
 
 
+def deleteData():
+    # url = "http://114.132.235.86:3001/api/v1/ratioInformation"
+    url = "http://114.132.235.86:3001/api/v1/soldAllInformation"
+    data = {
+        "year": 2023,
+        "month": 10,
+    }
+    # resp = requests.delete(url, json=data)
+    resp = requests.delete(url)
 
-# getAreaData_month()
-# getTotalData_months()
-getInformation()
+
+def job():
+    # 在这里编写要执行的工作
+    today = datetime.date.today()
+    if today.day == 1:
+        getAreaData_month()
+        getTotalData_month()
+
+
+def timer():
+    scheduler = BlockingScheduler()
+    scheduler.add_job(job, 'cron', day='1')
+    scheduler.start()
+
+
+if __name__ == "__main__":
+    # timer()
+    deleteData()
+    getTotalData_months()
+    getInformation()
